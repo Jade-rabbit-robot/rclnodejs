@@ -102,12 +102,18 @@ class NaviActionClient {
     await this._actionClient.waitForServer();
 
     const goal = new nav2_msgs.Goal();
+
     goal.poses = path;
 
     this._node.getLogger().info('Sending goal request...');
 
     const goalHandle = await this._actionClient.sendGoal(goal, (feedback) =>
       this.feedbackCallback(feedback)
+    );
+
+    // Start a 2 second timer
+    this._timer = this._node.createTimer(2000, () =>
+      this.timerCallback(goalHandle)
     );
 
     if (!goalHandle.isAccepted()) {
@@ -138,6 +144,22 @@ class NaviActionClient {
     this._node
       .getLogger()
       .info(`Received feedback: ${feedback.current_waypoint}`);
+  }
+
+  async timerCallback(goalHandle) {
+    this._node.getLogger().info('Canceling goal');
+    // Cancel the timer
+    this._timer.cancel();
+
+    const response = await goalHandle.cancelGoal();
+
+    if (response.goals_canceling.length > 0) {
+      this._node.getLogger().info('Goal successfully canceled');
+    } else {
+      this._node.getLogger().info('Goal failed to cancel');
+    }
+
+    rclnodejs.shutdown();
   }
 }
 
